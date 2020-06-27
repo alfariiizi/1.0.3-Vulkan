@@ -6,6 +6,35 @@
 #include <algorithm>
 #include <string>
 
+#ifdef NDEBUG
+const bool enableValidationLayer = false;
+#else
+const bool enableValidationLayer = true;
+#endif
+
+const std::vector<const char*> validationLayer = {
+	"VK_LAYER_KHRONOS_validation"
+};
+
+bool CheckValidationLayerProperties()
+{
+	uint32_t layerCount = 0;
+	vkEnumerateInstanceLayerProperties( &layerCount, nullptr );
+	std::vector<VkLayerProperties> validationLayerAvailable( layerCount );
+	vkEnumerateInstanceLayerProperties( &layerCount, validationLayerAvailable.data() );
+
+	bool isAvailable = true;
+	for( const auto& i : validationLayer )
+	{
+		if( std::find( validationLayerAvailable.begin(), validationLayerAvailable.end(), i ) == validationLayerAvailable.end() )
+		{
+			isAvailable = false;
+			break;
+		}
+	}
+	return isAvailable;
+}
+
 class HelloTriangleApp
 {
 public:
@@ -31,6 +60,9 @@ private:
 	}
 	void InitInstance()
 	{
+		if( enableValidationLayer && !CheckValidationLayerProperties() )
+			throw std::runtime_error( "Validation Layer requested, but not available!" );
+
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = "Hello Triangle";
@@ -47,7 +79,14 @@ private:
 		const char** glfwExtensions = glfwGetRequiredInstanceExtensions( &glfwExtensionsCount );
 		createInfo.enabledExtensionCount = glfwExtensionsCount;
 		createInfo.ppEnabledExtensionNames = glfwExtensions;
-		createInfo.enabledLayerCount = 0;
+
+		if( enableValidationLayer )
+		{
+			createInfo.enabledLayerCount = static_cast<uint32_t>( validationLayer.size() );
+			createInfo.ppEnabledLayerNames = validationLayer.data();
+		}
+		else
+			createInfo.enabledLayerCount = 0U;
 
 		if( vkCreateInstance( &createInfo, nullptr, &instance ) != VK_SUCCESS )
 			throw std::runtime_error( "Failed to create instance\n" );
