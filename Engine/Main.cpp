@@ -5,6 +5,8 @@
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <map>
+#include <optional>
 
 #ifdef NDEBUG
 const bool enableValidationLayer = false;
@@ -43,6 +45,40 @@ void DestroyDebugUtilsMessengerEXT(
 		throw std::runtime_error( "Failed destroy the debug messenger!" );
 }
 
+struct QueueFamilyIndices
+{
+public:
+	bool IsComplete() const
+	{
+		return graphicsFamily.has_value();
+	}
+public:
+	std::optional<uint32_t> graphicsFamily;
+};
+
+QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice device )
+{
+	QueueFamilyIndices indices;
+
+	uint32_t queueFamiliesCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, nullptr );
+	std::vector<VkQueueFamilyProperties> queueFamilies( queueFamiliesCount );
+	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, queueFamilies.data() );
+
+	int i = 0;
+	for( const auto& queueFamily : queueFamilies )
+	{
+		if( queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT )
+		{
+			indices.graphicsFamily = i;
+			break;
+		}
+		++i;
+	}
+
+	return indices;
+}
+
 class HelloTriangleApp
 {
 public:
@@ -66,6 +102,7 @@ private:
 	{
 		InitInstance();
 		SetupDebugMessenger();
+		PickPhysicalDevice();
 	}
 	void InitInstance()
 	{
@@ -114,6 +151,42 @@ private:
 		if( !CheckExtensionProperties( extensions, vkExtensions ) )
 			throw std::runtime_error( "Failed to found the extensions\n" );
 
+	}
+	void PickPhysicalDevice()
+	{
+		uint32_t physicalDeviceCount = 0;
+		vkEnumeratePhysicalDevices( instance, &physicalDeviceCount, nullptr );
+
+		if( physicalDeviceCount == 0 )
+			throw std::runtime_error( "Failed to find GPUs with Vulkan Support!" );
+
+		std::vector<VkPhysicalDevice> devices( physicalDeviceCount );
+		vkEnumeratePhysicalDevices( instance, &physicalDeviceCount, devices.data() );
+
+		for( const auto& device : devices )
+		{
+			if( IsDeviceSuitable( device ) )
+			{
+				physicalDevice = device;
+				break;
+			}
+		}
+		if( physicalDevice == VK_NULL_HANDLE )
+			throw std::runtime_error( "Failed to find suitable GPUs!" );
+
+		//pilih yang atas (dikomen) itu, atau yang bawah ini. [pilih salah satu!]
+
+		/*std::multimap<int, VkPhysicalDevice> candidates;
+		for( const auto device : devices )
+		{
+			const int score = RateDeviceSuitability( device );
+			candidates.insert( std::make_pair( score, device ) );
+		}
+
+		if( candidates.rbegin()->first > 0 )
+			physicalDevice = candidates.rbegin()->second;
+		else
+			throw std::runtime_error( "Failed to find suitable GPUs!" );*/
 	}
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSaverity,
@@ -175,6 +248,25 @@ private:
 		
 		return extensions;
 	}
+	int RateDeviceSuitability( VkPhysicalDevice device )
+	{
+		VkPhysicalDeviceProperties deviceProperties;
+		VkPhysicalDeviceFeatures deviceFeatures;
+		vkGetPhysicalDeviceProperties( device, &deviceProperties );
+		vkGetPhysicalDeviceFeatures( device, &deviceFeatures );
+
+		int score = 0;
+
+		if( !deviceFeatures.geometryShader )
+			return 0;
+
+		if( deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU )
+			score += 1000;
+
+		score += deviceProperties.limits.maxImageDimension2D;
+
+		return 0;
+	}
 
 	//Checks member functions
 	bool CheckExtensionProperties( const std::vector<const char*>& extensions, std::vector<VkExtensionProperties>& vkExtensions )
@@ -214,6 +306,20 @@ private:
 		}
 		return isAvailable;
 	}
+	bool IsDeviceSuitable( VkPhysicalDevice device )
+	{
+		/*VkPhysicalDeviceProperties deviceProperties;
+		VkPhysicalDeviceFeatures deviceFeatures;
+		vkGetPhysicalDeviceProperties( device, &deviceProperties );
+		vkGetPhysicalDeviceFeatures( device, &deviceFeatures );
+
+		return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+			deviceFeatures.geometryShader;*/
+
+		//kita bakalan gunain apapun graphics card nya
+		QueueFamilyIndices indices = FindQueueFamilies( device );
+		return indices.IsComplete();
+	}
 
 public:
 	static constexpr int ScreenWidth = 800;
@@ -222,6 +328,7 @@ private:
 	GLFWwindow* window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 };
 
 int main()
