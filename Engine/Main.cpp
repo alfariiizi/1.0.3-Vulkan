@@ -52,6 +52,10 @@ public:
 	{
 		return graphicsFamily.has_value();
 	}
+	int Value() const
+	{
+		return graphicsFamily.value();
+	}
 public:
 	std::optional<uint32_t> graphicsFamily;
 };
@@ -103,6 +107,7 @@ private:
 		InitInstance();
 		SetupDebugMessenger();
 		PickPhysicalDevice();
+		CreateLogicalDevice();
 	}
 	void InitInstance()
 	{
@@ -188,6 +193,51 @@ private:
 		else
 			throw std::runtime_error( "Failed to find suitable GPUs!" );*/
 	}
+	void CreateLogicalDevice()
+	{
+		QueueFamilyIndices indices = FindQueueFamilies( physicalDevice );
+
+		VkDeviceQueueCreateInfo queueInfo{};
+		queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueInfo.flags = 0;
+		queueInfo.pNext = nullptr;
+		queueInfo.queueFamilyIndex = indices.Value();
+		queueInfo.queueCount = 1;
+
+		float queuePriority = 1.0f;
+// representing the relative priority of work submitted to each queues
+// the number are normalize number, in range 0.0f to 1.0f
+// Queues dengan priority yang tinggi akan dialokasikan dengan proses yang lebih banyak resource nya atau di jadwal lebih agresif [whatt]
+		queueInfo.pQueuePriorities = &queuePriority;
+
+
+		VkDeviceCreateInfo deviceInfo{};
+		deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		deviceInfo.pNext = nullptr;
+		deviceInfo.flags = 0;
+		deviceInfo.pQueueCreateInfos = &queueInfo;
+		deviceInfo.queueCreateInfoCount = 1;
+
+		VkPhysicalDeviceFeatures physicalDeviceFeatures = GetPhysicalDeviceFeatures( physicalDevice );
+		deviceInfo.pEnabledFeatures = &physicalDeviceFeatures;
+		deviceInfo.enabledExtensionCount = 0;
+		deviceInfo.ppEnabledExtensionNames = nullptr;
+		if( enableValidationLayer )
+		{
+			deviceInfo.enabledLayerCount = static_cast<uint32_t>( validationLayer.size() );
+			deviceInfo.ppEnabledLayerNames = validationLayer.data();
+		}
+		else
+		{
+			deviceInfo.enabledLayerCount = 0;
+			deviceInfo.ppEnabledLayerNames = nullptr;
+		}
+
+		if( vkCreateDevice( physicalDevice, &deviceInfo, nullptr, &device ) != VK_SUCCESS )
+			throw std::runtime_error( "Failed to create Logical Device" );
+
+		vkGetDeviceQueue( device, indices.Value(), 0, &queue );
+	}
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSaverity,
 		VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -227,6 +277,8 @@ private:
 	}
 	void CleanUp()
 	{
+		vkDestroyDevice( device, nullptr );
+
 		if( enableValidationLayer )
 			DestroyDebugUtilsMessengerEXT( instance, debugMessenger, nullptr );
 
@@ -266,6 +318,28 @@ private:
 		score += deviceProperties.limits.maxImageDimension2D;
 
 		return 0;
+	}
+	std::pair<VkPhysicalDeviceProperties, VkPhysicalDeviceFeatures> 
+		GetPhysicalDevicePropertiesAndFeatures( VkPhysicalDevice physicalDevice ) const
+	{
+		VkPhysicalDeviceProperties deviceProperties;
+		VkPhysicalDeviceFeatures deviceFeatures;
+		vkGetPhysicalDeviceProperties( physicalDevice, &deviceProperties );
+		vkGetPhysicalDeviceFeatures( physicalDevice, &deviceFeatures );
+
+		return { deviceProperties, deviceFeatures };
+	}
+	VkPhysicalDeviceProperties GetPhysicalDeviceProperties( VkPhysicalDevice physicalDevice ) const
+	{
+		VkPhysicalDeviceProperties properties;
+		vkGetPhysicalDeviceProperties( physicalDevice, &properties );
+		return properties;
+	}
+	VkPhysicalDeviceFeatures GetPhysicalDeviceFeatures( VkPhysicalDevice physicalDevice ) const
+	{
+		VkPhysicalDeviceFeatures features;
+		vkGetPhysicalDeviceFeatures( physicalDevice, &features );
+		return features;
 	}
 
 	//Checks member functions
@@ -329,6 +403,8 @@ private:
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkDevice device;
+	VkQueue queue;
 };
 
 int main()
