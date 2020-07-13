@@ -1,5 +1,8 @@
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 #include <glfw/glfw3.h>
+#include <glfw/glfw3native.h>
 
 #include <iostream>
 #include <vector>
@@ -7,6 +10,7 @@
 #include <string>
 #include <map>
 #include <optional>
+#include <set>
 
 #ifdef NDEBUG
 const bool enableValidationLayer = false;
@@ -50,38 +54,20 @@ struct QueueFamilyIndices
 public:
 	bool IsComplete() const
 	{
-		return graphicsFamily.has_value();
+		return graphicsFamily.has_value() && presentFamily.has_value();
 	}
-	int Value() const
+	uint32_t GetGraphicsFamilyValue() const
 	{
 		return graphicsFamily.value();
 	}
+	uint32_t GetPresentFamilyValue() const
+	{
+		return presentFamily.value();
+	}
 public:
 	std::optional<uint32_t> graphicsFamily;
+	std::optional<uint32_t> presentFamily;
 };
-
-QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice device )
-{
-	QueueFamilyIndices indices;
-
-	uint32_t queueFamiliesCount = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, nullptr );
-	std::vector<VkQueueFamilyProperties> queueFamilies( queueFamiliesCount );
-	vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, queueFamilies.data() );
-
-	int i = 0;
-	for( const auto& queueFamily : queueFamilies )
-	{
-		if( queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT )
-		{
-			indices.graphicsFamily = i;
-			break;
-		}
-		++i;
-	}
-
-	return indices;
-}
 
 class HelloTriangleApp
 {
@@ -106,6 +92,7 @@ private:
 	{
 		InitInstance();
 		SetupDebugMessenger();
+		CreateSurface();
 		PickPhysicalDevice();
 		CreateLogicalDevice();
 	}
@@ -197,26 +184,33 @@ private:
 	{
 		QueueFamilyIndices indices = FindQueueFamilies( physicalDevice );
 
-		VkDeviceQueueCreateInfo queueInfo{};
-		queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueInfo.flags = 0;
-		queueInfo.pNext = nullptr;
-		queueInfo.queueFamilyIndex = indices.Value();
-		queueInfo.queueCount = 1;
+		std::vector<VkDeviceQueueCreateInfo> queueInfosss;
+		std::set<uint32_t> uniqueQueueFamilies{ indices.GetGraphicsFamilyValue(), indices.GetPresentFamilyValue() };
 
 		float queuePriority = 1.0f;
+
+		for( uint32_t queueFamily : uniqueQueueFamilies )
+		{
+			VkDeviceQueueCreateInfo queueInfo{};
+			queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queueInfo.flags = 0;
+			queueInfo.pNext = nullptr;
+			queueInfo.queueFamilyIndex = queueFamily;
+			queueInfo.queueCount = 1;
 // representing the relative priority of work submitted to each queues
 // the number are normalize number, in range 0.0f to 1.0f
 // Queues dengan priority yang tinggi akan dialokasikan dengan proses yang lebih banyak resource nya atau di jadwal lebih agresif [whatt]
-		queueInfo.pQueuePriorities = &queuePriority;
+			queueInfo.pQueuePriorities = &queuePriority;
 
+			queueInfosss.push_back( queueInfo );
+		}
 
 		VkDeviceCreateInfo deviceInfo{};
 		deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		deviceInfo.pNext = nullptr;
 		deviceInfo.flags = 0;
-		deviceInfo.pQueueCreateInfos = &queueInfo;
-		deviceInfo.queueCreateInfoCount = 1;
+		deviceInfo.pQueueCreateInfos = queueInfosss.data();
+		deviceInfo.queueCreateInfoCount = static_cast<uint32_t>( queueInfosss.size() );
 
 		VkPhysicalDeviceFeatures physicalDeviceFeatures = GetPhysicalDeviceFeatures( physicalDevice );
 		deviceInfo.pEnabledFeatures = &physicalDeviceFeatures;
@@ -236,7 +230,8 @@ private:
 		if( vkCreateDevice( physicalDevice, &deviceInfo, nullptr, &device ) != VK_SUCCESS )
 			throw std::runtime_error( "Failed to create Logical Device" );
 
-		vkGetDeviceQueue( device, indices.Value(), 0, &queue );
+		vkGetDeviceQueue( device, indices.GetGraphicsFamilyValue(), 0, &graphicsQueue );
+		vkGetDeviceQueue( device, indices.GetPresentFamilyValue(), 0, &presentQueue );
 	}
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSaverity,
@@ -270,6 +265,18 @@ private:
 			throw std::runtime_error( "Failed to setup debug messenger!" );
 
 	}
+	void CreateSurface()
+	{
+		VkWin32SurfaceCreateInfoKHR surfaceInfo{};
+		surfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		surfaceInfo.flags = 0;
+		surfaceInfo.pNext = nullptr;
+		surfaceInfo.hwnd = glfwGetWin32Window( window );
+		surfaceInfo.hinstance = GetModuleHandle( nullptr );
+
+		if( vkCreateWin32SurfaceKHR( instance, &surfaceInfo, nullptr, &surface ) != VK_SUCCESS )
+			throw std::runtime_error( "Failed to create Surface" );
+	}
 	void MainLoop()
 	{
 		while( !glfwWindowShouldClose( window ) )
@@ -282,6 +289,7 @@ private:
 		if( enableValidationLayer )
 			DestroyDebugUtilsMessengerEXT( instance, debugMessenger, nullptr );
 
+		vkDestroySurfaceKHR( instance, surface, nullptr );
 		vkDestroyInstance( instance, nullptr );
 		glfwDestroyWindow( window );
 
@@ -340,6 +348,35 @@ private:
 		VkPhysicalDeviceFeatures features;
 		vkGetPhysicalDeviceFeatures( physicalDevice, &features );
 		return features;
+	}
+	QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice device )
+	{
+		QueueFamilyIndices indices;
+
+		uint32_t queueFamiliesCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, nullptr );
+		std::vector<VkQueueFamilyProperties> queueFamilies( queueFamiliesCount );
+		vkGetPhysicalDeviceQueueFamilyProperties( device, &queueFamiliesCount, queueFamilies.data() );
+
+		VkBool32 isPresentSupport = false;
+		int i = 0;
+		for( const auto& queueFamily : queueFamilies )
+		{
+			if( (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) && !indices.graphicsFamily.has_value() )
+				indices.graphicsFamily = i;
+
+			vkGetPhysicalDeviceSurfaceSupportKHR( device, i, surface, &isPresentSupport );
+
+			if( isPresentSupport && !indices.presentFamily.has_value() )
+				indices.presentFamily = i;
+
+			if( indices.IsComplete() )
+				break;
+
+			++i;
+		}
+
+		return indices;
 	}
 
 	//Checks member functions
@@ -402,9 +439,11 @@ private:
 	GLFWwindow* window;
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
+	VkSurfaceKHR surface;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device;
-	VkQueue queue;
+	VkQueue graphicsQueue;
+	VkQueue presentQueue;
 };
 
 int main()
