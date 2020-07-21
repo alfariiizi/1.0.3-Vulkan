@@ -165,8 +165,8 @@ void HelloTriangleApp::CreateLogicalDevice()
 
 	VkPhysicalDeviceFeatures physicalDeviceFeatures = GetPhysicalDeviceFeatures( physicalDevice );
 	deviceInfo.pEnabledFeatures = &physicalDeviceFeatures;
-	deviceInfo.enabledExtensionCount = 0;
-	deviceInfo.ppEnabledExtensionNames = nullptr;
+	deviceInfo.enabledExtensionCount = static_cast<uint32_t>( deviceExtensionsNeeded.size() );
+	deviceInfo.ppEnabledExtensionNames = deviceExtensionsNeeded.data();
 	if( enableValidationLayer )
 	{
 		deviceInfo.enabledLayerCount = static_cast<uint32_t>( validationLayer.size() );
@@ -357,7 +357,7 @@ bool HelloTriangleApp::CheckValidationLayerProperties()
 	return isAvailable;
 }
 
-bool HelloTriangleApp::IsDeviceSuitable( VkPhysicalDevice device )
+bool HelloTriangleApp::IsDeviceSuitable( VkPhysicalDevice physicalDevice )
 {
 	/*VkPhysicalDeviceProperties deviceProperties;
 		VkPhysicalDeviceFeatures deviceFeatures;
@@ -368,6 +368,41 @@ bool HelloTriangleApp::IsDeviceSuitable( VkPhysicalDevice device )
 			deviceFeatures.geometryShader;*/
 
 			//kita bakalan gunain apapun graphics card nya
-	QueueFamilyIndices indices = FindQueueFamilies( device );
-	return indices.IsComplete();
+	QueueFamilyIndices indices = FindQueueFamilies( physicalDevice );
+	bool extensionSupported = CheckDeviceExtensionSupport( physicalDevice );
+
+	return indices.IsComplete() && extensionSupported;
+}
+
+bool HelloTriangleApp::CheckDeviceExtensionSupport( VkPhysicalDevice physicalDevice )
+{
+	uint32_t deviceExtensionsCount = 0;
+	vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &deviceExtensionsCount, nullptr );
+	std::vector<VkExtensionProperties> deviceExtensions( deviceExtensionsCount );
+	vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &deviceExtensionsCount, deviceExtensions.data() );
+
+	//std::set<std::string> requiredExtension( deviceExtensionsNeeded.begin(), deviceExtensionsNeeded.end() );
+	//for( const auto& e : deviceExtensions )
+	//	requiredExtension.erase( e.extensionName );
+
+	//return requiredExtension.empty(); //jika kosong, maka akan me-return true
+
+	// ----> kode tepat diatas yang aku komen itu merupakan solusi dari si author vulkan tutorial.
+
+	bool isFound = true;
+	for( const auto& e : deviceExtensionsNeeded )
+	{
+		if(
+			std::find_if( deviceExtensions.begin(), deviceExtensions.end(),
+				[&e]( const VkExtensionProperties& v )
+				{
+					return std::strcmp( v.extensionName, e ) == 0;
+				}
+			) == deviceExtensions.end() )
+		{
+			isFound = false;
+			break;
+		}
+	}
+	return isFound;
 }

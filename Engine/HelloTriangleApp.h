@@ -29,6 +29,10 @@ const std::vector<const char*> validationLayer = {
 };
 // _________________________
 
+//si author vulkan tutorial menamainya "deviceExtensions"
+const std::vector<const char*> deviceExtensionsNeeded = {
+	"VK_KHR_swapchain"
+};
 
 class HelloTriangleApp
 {
@@ -80,7 +84,8 @@ private:
 	// ---------------
 	bool CheckExtensionProperties( const std::vector<const char*>& extensions, std::vector<VkExtensionProperties>& vkExtensions );
 	bool CheckValidationLayerProperties();
-	bool IsDeviceSuitable( VkPhysicalDevice device );
+	bool IsDeviceSuitable( VkPhysicalDevice physicalDevice );
+	bool CheckDeviceExtensionSupport( VkPhysicalDevice physicalDevice );
 	// ---------------
 
 public:
