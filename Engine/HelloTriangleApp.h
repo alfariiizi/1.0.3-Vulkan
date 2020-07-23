@@ -16,6 +16,7 @@
 
 #include "DebugUtilsMessengerEXT.h"
 #include "QueueFamilyIndices.h"
+#include "SwapChainSupportDetails.h"
 
 // ___ VALIDATION LAYER ____
 #ifdef NDEBUG
@@ -78,6 +79,7 @@ private:
 	VkPhysicalDeviceProperties GetPhysicalDeviceProperties( VkPhysicalDevice physicalDevice ) const;
 	VkPhysicalDeviceFeatures GetPhysicalDeviceFeatures( VkPhysicalDevice physicalDevice ) const;
 	QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice device );
+	SwapChainSupportDetails QuerySwapChainSupport( VkPhysicalDevice physicalDevice );
 	// -------------
 
 	// --- CHECKER ---

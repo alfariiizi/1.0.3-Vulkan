@@ -317,6 +317,38 @@ QueueFamilyIndices HelloTriangleApp::FindQueueFamilies( VkPhysicalDevice device 
 	return indices;
 }
 
+SwapChainSupportDetails HelloTriangleApp::QuerySwapChainSupport( VkPhysicalDevice physicalDevice )
+{
+	SwapChainSupportDetails details;
+	
+	// Get Basic Surface Capabilites details
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR( physicalDevice, surface, &details.capabilities );
+
+	// Get Surface Format details
+	// ----------------------
+	uint32_t surfaceFormatCount = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &surfaceFormatCount, nullptr );
+	if( surfaceFormatCount != 0 )
+	{
+		details.format.resize( surfaceFormatCount );
+		vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &surfaceFormatCount, details.format.data() );
+	}
+	// ----------------------
+
+	// Get Presentation Modes details
+	// --------------------------
+	uint32_t presentationModesCount = 0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentationModesCount, nullptr );
+	if( presentationModesCount != 0 )
+	{
+		details.presentationModes.resize( presentationModesCount );
+		vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentationModesCount, details.presentationModes.data() );
+	}
+	// --------------------------
+
+	return details;
+}
+
 bool HelloTriangleApp::CheckExtensionProperties( 
 	const std::vector<const char*>& extensions, std::vector<VkExtensionProperties>& vkExtensions )
 {
@@ -371,7 +403,17 @@ bool HelloTriangleApp::IsDeviceSuitable( VkPhysicalDevice physicalDevice )
 	QueueFamilyIndices indices = FindQueueFamilies( physicalDevice );
 	bool extensionSupported = CheckDeviceExtensionSupport( physicalDevice );
 
-	return indices.IsComplete() && extensionSupported;
+	// verifying swap chain support
+	// ----------------------------
+	bool swapChainAdquate = false;
+	if( extensionSupported )
+	{
+		SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport( physicalDevice );
+		swapChainAdquate = !swapChainSupport.format.empty() && !swapChainSupport.presentationModes.empty();
+	}
+	// ----------------------------
+
+	return indices.IsComplete() && extensionSupported && swapChainAdquate;
 }
 
 bool HelloTriangleApp::CheckDeviceExtensionSupport( VkPhysicalDevice physicalDevice )

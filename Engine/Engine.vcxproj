@@ -150,6 +150,7 @@
     <ClInclude Include="DebugUtilsMessengerEXT.h" />
     <ClInclude Include="HelloTriangleApp.h" />
     <ClInclude Include="QueueFamilyIndices.h" />
+    <ClInclude Include="SwapChainSupportDetails.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
