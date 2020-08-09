@@ -241,51 +241,49 @@ void HelloTriangleApp::CreateSurface()
 void HelloTriangleApp::CreateSwapChain()
 {
 	SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport( physicalDevice );
+
 	VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat( swapChainSupport.format );
 	VkPresentModeKHR presentMode = ChooseSwapPresentMode( swapChainSupport.presentationModes );
 	VkExtent2D extent = ChooseSwapExtent( swapChainSupport.capabilities );
 
 	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-	if( swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount )
+	if( swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount ) {
 		imageCount = swapChainSupport.capabilities.maxImageCount;
+	}
 
-	// Creation info
-	// -------------
-	VkSwapchainCreateInfoKHR swapchainInfo;
-	swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-	swapchainInfo.surface = surface;
-	swapchainInfo.minImageCount = imageCount;
-	swapchainInfo.imageFormat = surfaceFormat.format;
-	swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
-	swapchainInfo.imageExtent = extent;
-	swapchainInfo.imageArrayLayers = 1;
-	swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	
+	VkSwapchainCreateInfoKHR createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	createInfo.surface = surface;
+
+	createInfo.minImageCount = imageCount;
+	createInfo.imageFormat = surfaceFormat.format;
+	createInfo.imageColorSpace = surfaceFormat.colorSpace;
+	createInfo.imageExtent = extent;
+	createInfo.imageArrayLayers = 1;
+	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
 	QueueFamilyIndices indices = FindQueueFamilies( physicalDevice );
-	uint32_t queueFamilyIndices [] = { indices.GetGraphicsFamilyValue(), indices.GetPresentFamilyValue() };
-	if( indices.graphicsFamily != indices.presentFamily )
-	{
-		swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-		swapchainInfo.queueFamilyIndexCount = 2;
-		swapchainInfo.pQueueFamilyIndices = queueFamilyIndices;
+	uint32_t queueFamilyIndices [] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
+	if( indices.graphicsFamily != indices.presentFamily ) {
+		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		createInfo.queueFamilyIndexCount = 2;
+		createInfo.pQueueFamilyIndices = queueFamilyIndices;
 	}
-	else
-	{
-		swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	else {
+		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	}
 
-	swapchainInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-	swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-	swapchainInfo.presentMode = presentMode;
-	swapchainInfo.clipped = VK_TRUE;
-	swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
-	// -------------
+	createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	createInfo.presentMode = presentMode;
+	createInfo.clipped = VK_TRUE;
 
-	// Creating Swapchain
-	// ------------------
-	if( vkCreateSwapchainKHR( device, &swapchainInfo, nullptr, &swapchain ) != VK_SUCCESS )
-		throw std::runtime_error( "Failed to create swapchain !" );
-	// ------------------
+	createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+	if( vkCreateSwapchainKHR( device, &createInfo, nullptr, &swapchain ) != VK_SUCCESS ) {
+		throw std::runtime_error( "failed to create swap chain!" );
+	}
 
 	// Retrieving Swapchain Images
 	// ---------------------------
