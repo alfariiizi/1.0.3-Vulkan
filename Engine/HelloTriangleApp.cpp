@@ -26,6 +26,7 @@ void HelloTriangleApp::InitVulkan()
 	PickPhysicalDevice();
 	CreateLogicalDevice();
 	CreateSwapChain();
+	CreateImageViews();
 }
 
 void HelloTriangleApp::MainLoop()
@@ -36,6 +37,9 @@ void HelloTriangleApp::MainLoop()
 
 void HelloTriangleApp::CleanUp()
 {
+	for( auto& imageView : swapchainImageViews )
+		vkDestroyImageView( device, imageView, nullptr );
+
 	vkDestroySwapchainKHR( device, swapchain, nullptr );
 
 	vkDestroyDevice( device, nullptr );
@@ -299,6 +303,36 @@ void HelloTriangleApp::CreateSwapChain()
 	swapchainFormat = surfaceFormat.format;
 	swapchainExtent = extent;
 	// ------------------------------------------------------------------------------------
+}
+
+void HelloTriangleApp::CreateImageViews()
+{
+	swapchainImageViews.resize( swapchainImages.size() );
+
+	for( size_t i = 0; i < swapchainImages.size(); ++i )
+	{
+		VkImageViewCreateInfo imageViewInfo{};
+		imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		imageViewInfo.image = swapchainImages[i];
+		imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		imageViewInfo.format = swapchainFormat;
+
+		// component
+		imageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		imageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+		// subresource range
+		imageViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageViewInfo.subresourceRange.baseMipLevel = 0;
+		imageViewInfo.subresourceRange.levelCount = 1;
+		imageViewInfo.subresourceRange.baseArrayLayer = 0;
+		imageViewInfo.subresourceRange.layerCount = 1;
+
+		if( vkCreateImageView( device, &imageViewInfo, nullptr, &swapchainImageViews[i] ) != VK_SUCCESS )
+			throw std::runtime_error( "Failed to create imageview" );
+	}
 }
 
 std::vector<const char*> HelloTriangleApp::GetRequiredExtension()

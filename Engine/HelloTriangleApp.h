@@ -73,6 +73,9 @@ private:
 	//SWAP CHAIN
 	void CreateSwapChain();
 
+	//IMAGE VIEWS
+	void CreateImageViews();
+
 	// --- GETTER ---
 	// --------------
 	std::vector<const char*> GetRequiredExtension();
@@ -112,4 +115,5 @@ private:
 	std::vector<VkImage> swapchainImages;
 	VkFormat swapchainFormat;
 	VkExtent2D swapchainExtent;
+	std::vector<VkImageView> swapchainImageViews;
 };
