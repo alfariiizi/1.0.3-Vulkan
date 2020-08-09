@@ -1,10 +1,10 @@
 #pragma once
 
-#define GLFW_EXPOSE_NATIVE_WIN32
-#define VK_USE_PLATFORM_WIN32_KHR
+//#define GLFW_EXPOSE_NATIVE_WIN32
+//#define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 #include <glfw/glfw3.h>
-#include <glfw/glfw3native.h>
+//#include <glfw/glfw3native.h>
 
 #include <iostream>
 #include <vector>
@@ -32,7 +32,7 @@ const std::vector<const char*> validationLayer = {
 
 //si author vulkan tutorial menamainya "deviceExtensions"
 const std::vector<const char*> deviceExtensionsNeeded = {
-	"VK_KHR_swapchain"
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 class HelloTriangleApp
@@ -70,6 +70,9 @@ private:
 	//SURFACE
 	void CreateSurface();
 
+	//SWAP CHAIN
+	void CreateSwapChain();
+
 	// --- GETTER ---
 	// --------------
 	std::vector<const char*> GetRequiredExtension();
@@ -80,6 +83,9 @@ private:
 	VkPhysicalDeviceFeatures GetPhysicalDeviceFeatures( VkPhysicalDevice physicalDevice ) const;
 	QueueFamilyIndices FindQueueFamilies( VkPhysicalDevice device );
 	SwapChainSupportDetails QuerySwapChainSupport( VkPhysicalDevice physicalDevice );
+	VkSurfaceFormatKHR ChooseSwapSurfaceFormat( const std::vector<VkSurfaceFormatKHR>& availableSurfaceFormats );
+	VkPresentModeKHR ChooseSwapPresentMode( const std::vector<VkPresentModeKHR>& availablePresentModes );
+	VkExtent2D ChooseSwapExtent( const VkSurfaceCapabilitiesKHR& capabilities );
 	// -------------
 
 	// --- CHECKER ---
@@ -102,4 +108,8 @@ private:
 	VkDevice device;
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
+	VkSwapchainKHR swapchain;
+	std::vector<VkImage> swapchainImages;
+	VkFormat swapchainFormat;
+	VkExtent2D swapchainExtent;
 };

@@ -1,4 +1,5 @@
 #include "HelloTriangleApp.h"
+#include <algorithm>
 
 void HelloTriangleApp::Run()
 {
@@ -24,6 +25,7 @@ void HelloTriangleApp::InitVulkan()
 	CreateSurface();
 	PickPhysicalDevice();
 	CreateLogicalDevice();
+	CreateSwapChain();
 }
 
 void HelloTriangleApp::MainLoop()
@@ -34,6 +36,8 @@ void HelloTriangleApp::MainLoop()
 
 void HelloTriangleApp::CleanUp()
 {
+	vkDestroySwapchainKHR( device, swapchain, nullptr );
+
 	vkDestroyDevice( device, nullptr );
 
 	if( enableValidationLayer )
@@ -220,7 +224,7 @@ void HelloTriangleApp::SetupDebugMessenger()
 
 void HelloTriangleApp::CreateSurface()
 {
-	VkWin32SurfaceCreateInfoKHR surfaceInfo{};
+	/*VkWin32SurfaceCreateInfoKHR surfaceInfo{};
 	surfaceInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	surfaceInfo.flags = 0;
 	surfaceInfo.pNext = nullptr;
@@ -228,7 +232,73 @@ void HelloTriangleApp::CreateSurface()
 	surfaceInfo.hinstance = GetModuleHandle( nullptr );
 
 	if( vkCreateWin32SurfaceKHR( instance, &surfaceInfo, nullptr, &surface ) != VK_SUCCESS )
+		throw std::runtime_error( "Failed to create Surface" );*/
+
+	if( glfwCreateWindowSurface( instance, window, nullptr, &surface ) != VK_SUCCESS )
 		throw std::runtime_error( "Failed to create Surface" );
+}
+
+void HelloTriangleApp::CreateSwapChain()
+{
+	SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport( physicalDevice );
+	VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat( swapChainSupport.format );
+	VkPresentModeKHR presentMode = ChooseSwapPresentMode( swapChainSupport.presentationModes );
+	VkExtent2D extent = ChooseSwapExtent( swapChainSupport.capabilities );
+
+	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+	if( swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount )
+		imageCount = swapChainSupport.capabilities.maxImageCount;
+
+	// Creation info
+	// -------------
+	VkSwapchainCreateInfoKHR swapchainInfo;
+	swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	swapchainInfo.surface = surface;
+	swapchainInfo.minImageCount = imageCount;
+	swapchainInfo.imageFormat = surfaceFormat.format;
+	swapchainInfo.imageColorSpace = surfaceFormat.colorSpace;
+	swapchainInfo.imageExtent = extent;
+	swapchainInfo.imageArrayLayers = 1;
+	swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	
+	QueueFamilyIndices indices = FindQueueFamilies( physicalDevice );
+	uint32_t queueFamilyIndices [] = { indices.GetGraphicsFamilyValue(), indices.GetPresentFamilyValue() };
+	if( indices.graphicsFamily != indices.presentFamily )
+	{
+		swapchainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+		swapchainInfo.queueFamilyIndexCount = 2;
+		swapchainInfo.pQueueFamilyIndices = queueFamilyIndices;
+	}
+	else
+	{
+		swapchainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	}
+
+	swapchainInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+	swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	swapchainInfo.presentMode = presentMode;
+	swapchainInfo.clipped = VK_TRUE;
+	swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
+	// -------------
+
+	// Creating Swapchain
+	// ------------------
+	if( vkCreateSwapchainKHR( device, &swapchainInfo, nullptr, &swapchain ) != VK_SUCCESS )
+		throw std::runtime_error( "Failed to create swapchain !" );
+	// ------------------
+
+	// Retrieving Swapchain Images
+	// ---------------------------
+	vkGetSwapchainImagesKHR( device, swapchain, &imageCount, nullptr );
+	swapchainImages.resize( imageCount );
+	vkGetSwapchainImagesKHR( device, swapchain, &imageCount, swapchainImages.data() );
+	// ---------------------------
+
+	// Inisialisasi beberapa member variable yang mana akan berguna pada chapter berikutnya
+	// ------------------------------------------------------------------------------------
+	swapchainFormat = surfaceFormat.format;
+	swapchainExtent = extent;
+	// ------------------------------------------------------------------------------------
 }
 
 std::vector<const char*> HelloTriangleApp::GetRequiredExtension()
@@ -330,7 +400,7 @@ SwapChainSupportDetails HelloTriangleApp::QuerySwapChainSupport( VkPhysicalDevic
 	vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &surfaceFormatCount, nullptr );
 	if( surfaceFormatCount != 0 )
 	{
-		details.format.resize( surfaceFormatCount );
+		details.format.resize( static_cast<size_t>(surfaceFormatCount) );
 		vkGetPhysicalDeviceSurfaceFormatsKHR( physicalDevice, surface, &surfaceFormatCount, details.format.data() );
 	}
 	// ----------------------
@@ -341,12 +411,50 @@ SwapChainSupportDetails HelloTriangleApp::QuerySwapChainSupport( VkPhysicalDevic
 	vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentationModesCount, nullptr );
 	if( presentationModesCount != 0 )
 	{
-		details.presentationModes.resize( presentationModesCount );
+		details.presentationModes.resize( static_cast<size_t>(presentationModesCount) );
 		vkGetPhysicalDeviceSurfacePresentModesKHR( physicalDevice, surface, &presentationModesCount, details.presentationModes.data() );
 	}
 	// --------------------------
 
 	return details;
+}
+
+VkSurfaceFormatKHR HelloTriangleApp::ChooseSwapSurfaceFormat( const std::vector<VkSurfaceFormatKHR>& availableSurfaceFormats )
+{
+	for( const auto& a : availableSurfaceFormats )
+	{
+		if( a.format == VK_FORMAT_B8G8R8_SRGB && a.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR )
+			return a;
+	}
+
+	// jika VK_FORMAT_B8G8R8_SRGB dan VK_COLOR_SPACE_SRGB_NONLINEAR_KHR tidak ditemukan,
+	// maka kita me-return element array pertama dari Surface Format yang tersedia saja [pick seadanya :v]
+	return availableSurfaceFormats[0];
+}
+
+VkPresentModeKHR HelloTriangleApp::ChooseSwapPresentMode( const std::vector<VkPresentModeKHR>& availablePresentModes )
+{
+	for( const auto& a : availablePresentModes )
+	{
+		if( a == VK_PRESENT_MODE_MAILBOX_KHR ) // jika terdapat presentation mode yang capable dalam triple buffering
+			return a;
+	}
+
+	// kalau nggak ada yang capable dalam triple buffering, yaa kita return yang double buffering aja.
+	return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D HelloTriangleApp::ChooseSwapExtent( const VkSurfaceCapabilitiesKHR& capabilities )
+{
+	if( capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max() )
+		return capabilities.currentExtent;
+	else
+	{
+		VkExtent2D actualExtent = { ScreenWidth, ScreenHeight };
+		actualExtent.width = std::clamp( actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width );
+		actualExtent.height = std::clamp( actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height );
+		return actualExtent;
+	}
 }
 
 bool HelloTriangleApp::CheckExtensionProperties( 
@@ -405,15 +513,15 @@ bool HelloTriangleApp::IsDeviceSuitable( VkPhysicalDevice physicalDevice )
 
 	// verifying swap chain support
 	// ----------------------------
-	bool swapChainAdquate = false;
+	bool swapChainAdequate = false;
 	if( extensionSupported )
 	{
 		SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport( physicalDevice );
-		swapChainAdquate = !swapChainSupport.format.empty() && !swapChainSupport.presentationModes.empty();
+		swapChainAdequate = !swapChainSupport.format.empty() && !swapChainSupport.presentationModes.empty();
 	}
 	// ----------------------------
 
-	return indices.IsComplete() && extensionSupported && swapChainAdquate;
+	return indices.IsComplete() && extensionSupported && swapChainAdequate;
 }
 
 bool HelloTriangleApp::CheckDeviceExtensionSupport( VkPhysicalDevice physicalDevice )
@@ -423,20 +531,20 @@ bool HelloTriangleApp::CheckDeviceExtensionSupport( VkPhysicalDevice physicalDev
 	std::vector<VkExtensionProperties> deviceExtensions( deviceExtensionsCount );
 	vkEnumerateDeviceExtensionProperties( physicalDevice, nullptr, &deviceExtensionsCount, deviceExtensions.data() );
 
-	//std::set<std::string> requiredExtension( deviceExtensionsNeeded.begin(), deviceExtensionsNeeded.end() );
-	//for( const auto& e : deviceExtensions )
-	//	requiredExtension.erase( e.extensionName );
+	std::set<std::string> requiredExtension( deviceExtensionsNeeded.begin(), deviceExtensionsNeeded.end() );
+	for( const auto& e : deviceExtensions )
+		requiredExtension.erase( e.extensionName );
 
-	//return requiredExtension.empty(); //jika kosong, maka akan me-return true
+	return requiredExtension.empty(); //jika kosong, maka akan me-return true
 
 	// ----> kode tepat diatas yang aku komen itu merupakan solusi dari si author vulkan tutorial.
 
-	bool isFound = true;
+	/*bool isFound = true;
 	for( const auto& e : deviceExtensionsNeeded )
 	{
 		if(
 			std::find_if( deviceExtensions.begin(), deviceExtensions.end(),
-				[&e]( const VkExtensionProperties& v )
+				[e]( const VkExtensionProperties& v )
 				{
 					return std::strcmp( v.extensionName, e ) == 0;
 				}
@@ -446,5 +554,5 @@ bool HelloTriangleApp::CheckDeviceExtensionSupport( VkPhysicalDevice physicalDev
 			break;
 		}
 	}
-	return isFound;
+	return isFound;*/
 }
